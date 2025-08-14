@@ -9,7 +9,7 @@ on:
 # 워크플로우 전체에서 사용할 환경 변수
 env:
   # Docker Hub 사용자 이름과 이미지 이름을 조합
-  IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/gateway
+  IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/gateway-test
 
 jobs:
   build-and-push:
@@ -17,6 +17,10 @@ jobs:
     permissions:
       contents: read
       packages: write # Docker 이미지 푸시를 위해 필요
+      
+    defaults:
+      run:
+        working-directory: ./gateway-test
 
     steps:
       - name: 1. 소스 코드 체크아웃
@@ -43,7 +47,6 @@ jobs:
         run: |
           IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
           echo "Building and pushing image: ${{ env.IMAGE_NAME }}:$IMAGE_TAG"
-          # -f 옵션으로 Dockerfile의 정확한 경로를 지정하고,
-          # 빌드 컨텍스트(소스 코드) 경로도 함께 지정합니다.
-          docker build -f ./Dockerfile -t ${{ env.IMAGE_NAME }}:$IMAGE_TAG ./gateway-test
+          # defaults 설정에 따라 이 명령어는 ./gateway-test 디렉터리 안에서 실행됨
+          docker build -t ${{ env.IMAGE_NAME }}:$IMAGE_TAG .
           docker push ${{ env.IMAGE_NAME }}:$IMAGE_TAG
