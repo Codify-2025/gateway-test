@@ -7,15 +7,14 @@ on:
     branches: [ "main" ]
 
 # 워크플로우 전체에서 사용할 환경 변수
-env:
-  # Docker Hub 사용자 이름과 이미지 이름을 조합
-  IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/gateway-test
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     outputs:
-      IMAGE_TAG: ${{ steps.build_image.outputs.IMAGE_TAG }}
+      image_tag: ${{ steps.build_image.outputs.image_tag }}
+    env:
+      TAG: ${{ github.run_id }} 
     permissions:
       contents: read
       packages: write # Docker 이미지 푸시를 위해 필요
@@ -42,12 +41,13 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: 5. 도커 이미지 빌드 및 푸시
+        id: docker_build
         run: |
           IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
           echo "Building and pushing image: ${{ env.IMAGE_NAME }}:$IMAGE_TAG"
-          docker build -t ${{ env.IMAGE_NAME }}:$IMAGE_TAG -t ${{ env.IMAGE_NAME }}:latest .
-          docker push ${{ env.IMAGE_NAME }}:$IMAGE_TAG
-          docker push ${{ env.IMAGE_NAME }}:latest
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/gateway-test:${{ env.TAG }} .
+          docker push ${{ secrets.DOCKER_USERNAME }}/gateway-test:${{ env.TAG }}
+          echo "image_tag=${{ env.TAG }}" >> $GITHUB_OUTPUT
   # ============================================
   # CD 트리거 Job (매니페스트 업데이트)
   # ============================================
@@ -65,11 +65,9 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
 
       - name: 2. Deployment.yaml 파일의 이미지 태그 업데이트
+        working-directory: ./test/gateway-test
         run: |
-          IMAGE_TAG=${{ needs.build-and-push.outputs.IMAGE_TAG }}
-          IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/gateway-test
-          sed -i "s|^\s*image:.*|        image: ${IMAGE_NAME}:${IMAGE_TAG}|" ./test/gateway-test/deployment.yaml
-
+          sed -i "s|^\s*image:.*|        image: ${{ secrets.DOCKER_USERNAME }}/gateway-test:${{ needs.build-and-push.outputs.image_tag }}|" deployment.yaml
       - name: 3. 변경된 매니페스트 커밋 및 푸시
         run: |
           git config --global user.name 'dylee00'
@@ -78,7 +76,7 @@ jobs:
           if git diff-index --quiet HEAD; then
             echo "No changes to commit."
           else
-            git commit -m "CI: Update gateway-test image to ${{ needs.build-and-push.outputs.IMAGE_TAG }}"
+            git commit -m "CI: Update gateway-test image to ${{ needs.build-and-push.outputs.image_tag }}"
             git push
           fi
 
