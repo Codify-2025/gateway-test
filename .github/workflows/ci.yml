@@ -12,7 +12,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     outputs:
-      image_tag: ${{ steps.build_image.outputs.image_tag }}
+      image_tag: ${{ steps.docker_build.outputs.image_tag }}
     env:
       TAG: ${{ github.run_id }} 
     permissions:
@@ -67,7 +67,7 @@ jobs:
       - name: 2. Deployment.yaml 파일의 이미지 태그 업데이트
         working-directory: ./test/gateway-test
         run: |
-          sed -i "s|^\s*image:.*|        image: ${{ secrets.DOCKER_USERNAME }}/gateway-test:${{ needs.build-and-push.outputs.image_tag }}|" deployment.yaml
+          sed -i "s|image: ${{ secrets.DOCKER_USERNAME }}/gateway-test:.*|image: ${{ secrets.DOCKER_USERNAME }}/gateway-test:${{ needs.build-and-push.outputs.image_tag }}|" deployment.yaml
       - name: 3. 변경된 매니페스트 커밋 및 푸시
         run: |
           git config --global user.name 'dylee00'
