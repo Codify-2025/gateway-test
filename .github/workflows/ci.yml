@@ -17,10 +17,6 @@ jobs:
     permissions:
       contents: read
       packages: write # Docker 이미지 푸시를 위해 필요
-      
-    defaults:
-      run:
-        working-directory: ./gateway-test
 
     steps:
       - name: 1. 소스 코드 체크아웃
@@ -47,6 +43,5 @@ jobs:
         run: |
           IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
           echo "Building and pushing image: ${{ env.IMAGE_NAME }}:$IMAGE_TAG"
-          # defaults 설정에 따라 이 명령어는 ./gateway-test 디렉터리 안에서 실행됨
           docker build -t ${{ env.IMAGE_NAME }}:$IMAGE_TAG .
           docker push ${{ env.IMAGE_NAME }}:$IMAGE_TAG
