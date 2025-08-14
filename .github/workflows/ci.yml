@@ -1,5 +1,5 @@
 # 워크플로우 이름
-name: Spring Boot CI - Build and Push Docker Image
+name: CI/CD for gateway-test
 
 # 1. 실행 조건: main 브랜치에 push가 발생했을 때만 실행
 on:
@@ -47,3 +47,37 @@ jobs:
           echo "Building and pushing image: ${{ env.IMAGE_NAME }}:$IMAGE_TAG"
           docker build -t ${{ env.IMAGE_NAME }}:$IMAGE_TAG .
           docker push ${{ env.IMAGE_NAME }}:$IMAGE_TAG
+  # ============================================
+  # CD 트리거 Job (매니페스트 업데이트)
+  # ============================================
+  
+  deploy:
+    # 'build-and-push' job이 성공해야만 실행됨
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. 매니페스트 리포지토리 체크아웃
+        uses: actions/checkout@v4
+        with:
+          repository: Codify-2025/k8s-manifests
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: 2. Deployment.yaml 파일의 이미지 태그 업데이트
+        run: |
+          IMAGE_TAG=${{ needs.build-and-push.outputs.IMAGE_TAG }}
+          sed -i 's|image: .*|image: ${{ env.IMAGE_NAME }}:'$IMAGE_TAG'|g' ./test/gateway-test/deployment.yaml
+
+      - name: 3. 변경된 매니페스트 커밋 및 푸시
+        run: |
+          git config --global user.name 'dylee00'
+          git config --global user.email 'dylee6820@gmail.com'
+          git add .
+          if git diff-index --quiet HEAD; then
+            echo "No changes to commit."
+          else
+            git commit -m "CI: Update gateway-test image to ${{ needs.build-and-push.outputs.IMAGE_TAG }}"
+            git push
+          fi
+
+          
