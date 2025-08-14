@@ -12,7 +12,7 @@ public class GatewayTestApplication {
 
 	@RequestMapping("/test")
 	public String home() {
-		return "Hello world!!!";
+		return "Hello world! Hi";
 	}
 
 	public static void main(String[] args) {
