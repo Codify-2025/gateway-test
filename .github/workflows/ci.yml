@@ -41,7 +41,7 @@ jobs:
 
       - name: 5. 도커 이미지 빌드 및 푸시
         run: |
-          IMAGE_TAG=$(echo $GITHUB_SHA | cut-c1-7)
+          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
           echo "Building and pushing image: ${{ env.IMAGE_NAME }}:$IMAGE_TAG"
           # -f 옵션으로 Dockerfile의 정확한 경로를 지정하고,
           # 빌드 컨텍스트(소스 코드) 경로도 함께 지정합니다.
