@@ -67,7 +67,7 @@ jobs:
       - name: 2. Deployment.yaml 파일의 이미지 태그 업데이트
         run: |
           IMAGE_TAG=${{ needs.build-and-push.outputs.IMAGE_TAG }}
-          sed -i 's|image: .*|image: ${{ env.IMAGE_NAME }}:'$IMAGE_TAG'|g' ./test/gateway-test/deployment.yaml
+          sed -i 's|^\s*image:.*|        image: ${{ env.IMAGE_NAME }}:'$IMAGE_TAG'|' ./test/gateway-test/deployment.yaml
 
       - name: 3. 변경된 매니페스트 커밋 및 푸시
         run: |
