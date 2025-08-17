@@ -1,5 +1,5 @@
 # 워크플로우 이름
-name: Spring Boot CI - Build and Push Docker Image
+name: CI/CD for gateway-test
 
 # 1. 실행 조건: main 브랜치에 push가 발생했을 때만 실행
 on:
@@ -7,13 +7,14 @@ on:
     branches: [ "main" ]
 
 # 워크플로우 전체에서 사용할 환경 변수
-env:
-  # Docker Hub 사용자 이름과 이미지 이름을 조합
-  IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/gateway-test
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.docker_build.outputs.image_tag }}
+    env:
+      TAG: ${{ github.run_id }} 
     permissions:
       contents: read
       packages: write # Docker 이미지 푸시를 위해 필요
@@ -40,8 +41,43 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: 5. 도커 이미지 빌드 및 푸시
+        id: docker_build
         run: |
           IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
           echo "Building and pushing image: ${{ env.IMAGE_NAME }}:$IMAGE_TAG"
-          docker build -t ${{ env.IMAGE_NAME }}:$IMAGE_TAG .
-          docker push ${{ env.IMAGE_NAME }}:$IMAGE_TAG
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/gateway-test:${{ env.TAG }} .
+          docker push ${{ secrets.DOCKER_USERNAME }}/gateway-test:${{ env.TAG }}
+          echo "image_tag=${{ env.TAG }}" >> $GITHUB_OUTPUT
+  # ============================================
+  # CD 트리거 Job (매니페스트 업데이트)
+  # ============================================
+  
+  deploy:
+    # 'build-and-push' job이 성공해야만 실행됨
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. 매니페스트 리포지토리 체크아웃
+        uses: actions/checkout@v4
+        with:
+          repository: Codify-2025/k8s-manifests
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: 2. Deployment.yaml 파일의 이미지 태그 업데이트
+        working-directory: ./test/gateway-test
+        run: |
+          sed -i "s|image: ${{ secrets.DOCKER_USERNAME }}/gateway-test:.*|image: ${{ secrets.DOCKER_USERNAME }}/gateway-test:${{ needs.build-and-push.outputs.image_tag }}|" deployment.yaml
+      - name: 3. 변경된 매니페스트 커밋 및 푸시
+        run: |
+          git config --global user.name 'dylee00'
+          git config --global user.email 'dylee6820@gmail.com'
+          git add .
+          if git diff-index --quiet HEAD; then
+            echo "No changes to commit."
+          else
+            git commit -m "CI: Update gateway-test image to ${{ needs.build-and-push.outputs.image_tag }}"
+            git push
+          fi
+
+          
